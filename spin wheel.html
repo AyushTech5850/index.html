@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Spinning Wheel</title>
+
+<style>
+
+/* ===========================
+GENERAL PAGE STYLE
+=========================== */
+
+body{
+    font-family:Arial, sans-serif;
+    background:linear-gradient(135deg,#1e3c72,#2a5298);
+    color:white;
+    margin:0;
+    text-align:center;
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
+
+/* ===========================
+WHEEL AREA
+=========================== */
+
+.wheel-wrapper{
+    position:relative;
+    margin:auto;
+    width:420px;
+    height:420px;
+}
+
+canvas{
+    border-radius:50%;
+    background:#111;
+    box-shadow:
+        inset 0 0 20px rgba(255,255,255,0.2),
+        0 10px 40px rgba(0,0,0,0.6);
+}
+
+/* Pointer arrow */
+
+.pointer{
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    top:-5px;
+    width:0;
+    height:0;
+    border-left:18px solid transparent;
+    border-right:18px solid transparent;
+    border-bottom:30px solid #ffd700;
+}
+
+/* ===========================
+BUTTONS
+=========================== */
+
+button{
+    padding:12px 20px;
+    border:none;
+    border-radius:6px;
+    font-weight:bold;
+    cursor:pointer;
+    margin:5px;
+}
+
+#spinBtn{
+    background:#00d26a;
+    color:white;
+    font-size:18px;
+}
+
+button:hover{
+    transform:scale(1.05);
+}
+
+/* ===========================
+INPUT PANEL
+=========================== */
+
+.panel{
+    background:rgba(255,255,255,0.1);
+    padding:15px;
+    border-radius:10px;
+    margin-top:20px;
+}
+
+input{
+    padding:6px;
+}
+
+/* Item list */
+
+.item{
+    display:flex;
+    justify-content:space-between;
+    padding:5px;
+    margin:5px;
+    background:rgba(255,255,255,0.2);
+    border-radius:6px;
+}
+
+/* Result */
+
+#result{
+    font-size:24px;
+    margin-top:15px;
+    font-weight:bold;
+    color:#ffd700;
+}
+
+/* ===========================
+CONFETTI
+=========================== */
+
+.confetti{
+    position:fixed;
+    width:8px;
+    height:8px;
+    top:-10px;
+    animation:fall 3s linear forwards;
+}
+
+@keyframes fall{
+    to{
+        transform:translateY(100vh) rotate(720deg);
+        opacity:0;
+    }
+}
+
+/* Responsive */
+
+@media(max-width:500px){
+    .wheel-wrapper{
+        width:320px;
+        height:320px;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🎡 3D Spinning Wheel</h1>
+
+<div class="wheel-wrapper">
+
+<div class="pointer"></div>
+
+<canvas id="wheel" width="400" height="400"></canvas>
+
+</div>
+
+<br>
+
+<button id="spinBtn">SPIN</button>
+
+<div id="result"></div>
+
+<div class="panel">
+
+<h3>Add Item</h3>
+
+<input id="nameInput" placeholder="Name">
+<input id="qtyInput" type="number" min="1" value="1">
+<button onclick="addItem()">Add</button>
+
+<div id="itemsList"></div>
+
+</div>
+
+</div>
+
+<script>
+
+/* =============================
+DATA STORAGE
+============================= */
+
+let items=[
+{name:"Gold",qty:2},
+{name:"Silver",qty:1},
+{name:"Bronze",qty:1}
+];
+
+const colors=[
+"#ff7675","#74b9ff","#ffeaa7","#55efc4",
+"#a29bfe","#fd79a8","#81ecec","#fab1a0"
+];
+
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+
+let startAngle=0;
+let spinning=false;
+
+
+/* =============================
+SPIN SOUND
+============================= */
+
+const tick=new Audio(
+"https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
+);
+
+
+/* =============================
+DRAW WHEEL
+============================= */
+
+function drawWheel(){
+
+const total=items.reduce((s,i)=>s+i.qty,0);
+
+let angle=startAngle;
+
+ctx.clearRect(0,0,400,400);
+
+items.forEach((item,i)=>{
+
+const slice=(item.qty/total)*Math.PI*2;
+
+/* 3D gradient effect */
+
+const grad=ctx.createRadialGradient(
+200,200,50,
+200,200,200
+);
+
+grad.addColorStop(0,colors[i%colors.length]);
+grad.addColorStop(1,"#000");
+
+ctx.beginPath();
+
+ctx.moveTo(200,200);
+
+ctx.arc(200,200,200,angle,angle+slice);
+
+ctx.fillStyle=grad;
+
+ctx.fill();
+
+/* text */
+
+ctx.save();
+
+ctx.translate(200,200);
+
+ctx.rotate(angle+slice/2);
+
+ctx.fillStyle="#fff";
+
+ctx.textAlign="right";
+
+ctx.font="bold 16px Arial";
+
+ctx.fillText(item.name,180,5);
+
+ctx.restore();
+
+angle+=slice;
+
+});
+
+}
+
+
+/* =============================
+SPIN WHEEL
+============================= */
+
+function spinWheel(){
+
+if(spinning||items.length==0) return;
+
+spinning=true;
+
+const total=items.reduce((s,i)=>s+i.qty,0);
+
+/* weighted random */
+
+let r=Math.random()*total;
+
+let selected;
+
+for(let item of items){
+
+r-=item.qty;
+
+if(r<=0){
+selected=item;
+break;
+}
+
+}
+
+const index=items.indexOf(selected);
+
+const slice=(selected.qty/total)*360;
+
+const spins=6+Math.random()*5;
+
+const finalAngle=360*spins+(index*slice);
+
+animateSpin(finalAngle,selected);
+
+}
+
+
+/* =============================
+ANIMATION
+============================= */
+
+function animateSpin(deg,item){
+
+let start=null;
+
+const duration=5000;
+
+function frame(t){
+
+if(!start) start=t;
+
+const progress=t-start;
+
+const ease=1-Math.pow(1-progress/duration,3);
+
+startAngle=(deg*ease)*Math.PI/180;
+
+drawWheel();
+
+/* play tick sound */
+
+if(progress%200<20){
+tick.currentTime=0;
+tick.play();
+}
+
+if(progress<duration){
+
+requestAnimationFrame(frame);
+
+}else{
+
+spinning=false;
+
+document.getElementById("result").innerText=
+"Winner: "+item.name;
+
+/* confetti celebration */
+
+confetti();
+
+}
+
+}
+
+requestAnimationFrame(frame);
+
+}
+
+
+/* =============================
+CONFETTI EFFECT
+============================= */
+
+function confetti(){
+
+for(let i=0;i<150;i++){
+
+let div=document.createElement("div");
+
+div.className="confetti";
+
+div.style.left=Math.random()*100+"vw";
+
+div.style.background=
+colors[Math.floor(Math.random()*colors.length)];
+
+div.style.animationDuration=
+2+Math.random()*2+"s";
+
+document.body.appendChild(div);
+
+setTimeout(()=>div.remove(),4000);
+
+}
+
+}
+
+
+/* =============================
+ITEM MANAGEMENT
+============================= */
+
+function addItem(){
+
+const name=document.getElementById("nameInput").value;
+
+const qty=parseInt(
+document.getElementById("qtyInput").value
+);
+
+if(!name||qty<=0) return;
+
+items.push({name,qty});
+
+updateList();
+
+drawWheel();
+
+}
+
+function removeItem(i){
+
+items.splice(i,1);
+
+updateList();
+
+drawWheel();
+
+}
+
+function updateList(){
+
+const list=document.getElementById("itemsList");
+
+list.innerHTML="";
+
+items.forEach((item,i)=>{
+
+const div=document.createElement("div");
+
+div.className="item";
+
+div.innerHTML=
+item.name+" (x"+item.qty+")"+
+` <button onclick="removeItem(${i})">❌</button>`;
+
+list.appendChild(div);
+
+});
+
+}
+
+
+/* =============================
+INIT
+============================= */
+
+document.getElementById("spinBtn").onclick=spinWheel;
+
+updateList();
+
+drawWheel();
+
+</script>
+
+</body>
+</html>
