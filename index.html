@@ -3,28 +3,27 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Spin Wheel Picker</title>
+<title>Pro Spin Wheel</title>
 
 <style>
 
 body{
 font-family:Arial;
-background:#121212;
+background:#0f0f18;
 color:white;
 text-align:center;
 margin:0;
 }
 
 h1{
-margin-top:20px;
+margin-top:15px;
 }
 
 #wheel{
-margin-top:20px;
 border-radius:50%;
-box-shadow:0 0 30px rgba(0,0,0,0.7);
+box-shadow:0 0 40px rgba(0,0,0,0.8);
 }
 
 .pointer{
@@ -32,21 +31,23 @@ width:0;
 height:0;
 border-left:20px solid transparent;
 border-right:20px solid transparent;
-border-bottom:30px solid yellow;
+border-bottom:30px solid #ffd600;
 margin:auto;
 }
 
 .controls{
-margin-top:20px;
+margin-top:15px;
 }
 
 input{
 padding:8px;
-margin:5px;
+border-radius:6px;
+border:none;
+margin:4px;
 }
 
 button{
-padding:10px 16px;
+padding:10px 14px;
 border:none;
 border-radius:6px;
 background:#00c853;
@@ -59,15 +60,30 @@ button:hover{
 opacity:0.9;
 }
 
-#result{
-font-size:24px;
-margin-top:20px;
-color:#ffd600;
+.itemRow{
+margin:5px;
 }
 
-#history{
-margin-top:20px;
-font-size:14px;
+.removeBtn{
+background:#ff5252;
+margin-left:5px;
+}
+
+.weight{
+width:50px;
+}
+
+#winnerPopup{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:rgba(0,0,0,0.7);
+display:none;
+align-items:center;
+justify-content:center;
+font-size:40px;
 }
 
 </style>
@@ -76,35 +92,40 @@ font-size:14px;
 
 <body>
 
-<h1>🎡 Advanced Spin Wheel</h1>
+<h1>🎡 Pro Spin Wheel</h1>
 
 <div class="pointer"></div>
 
-<canvas id="wheel" width="400" height="400"></canvas>
+<canvas id="wheel" width="420" height="420"></canvas>
 
 <div class="controls">
 
-<input id="itemInput" placeholder="Add item">
+<input id="nameInput" placeholder="Item">
+<input id="weightInput" type="number" value="1" class="weight">
+
 <button onclick="addItem()">Add</button>
 
 <button onclick="spin()">SPIN</button>
 
-<button onclick="shareWheel()">Share Wheel</button>
-
 </div>
 
-<div id="result"></div>
+<div id="itemsList"></div>
 
-<div id="history"></div>
+<div id="winnerPopup" onclick="closePopup()"></div>
 
 <script>
 
-let items = JSON.parse(localStorage.getItem("wheelItems")) || ["Apple","Banana","Orange"];
+let items=JSON.parse(localStorage.getItem("wheelItems"))||[
+{name:"Apple",weight:1},
+{name:"Banana",weight:1},
+{name:"Orange",weight:1}
+];
 
 const canvas=document.getElementById("wheel");
 const ctx=canvas.getContext("2d");
 
-let startAngle=0;
+let angle=0;
+let velocity=0;
 
 const colors=[
 "#ff5252","#ff9800","#ffeb3b",
@@ -112,140 +133,206 @@ const colors=[
 "#e91e63","#00bcd4"
 ];
 
+const tick=new Audio(
+"https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
+);
+
+function totalWeight(){
+return items.reduce((sum,i)=>sum+i.weight,0);
+}
+
 function drawWheel(){
 
-let slice=2*Math.PI/items.length;
+ctx.clearRect(0,0,420,420);
 
-ctx.clearRect(0,0,400,400);
+let start=angle;
+let total=totalWeight();
 
 items.forEach((item,i)=>{
 
-let angle=startAngle+i*slice;
+let slice=(item.weight/total)*2*Math.PI;
 
 ctx.beginPath();
-ctx.moveTo(200,200);
-ctx.arc(200,200,200,angle,angle+slice);
+ctx.moveTo(210,210);
+ctx.arc(210,210,210,start,start+slice);
 
-ctx.fillStyle=colors[i%colors.length];
+let grad=ctx.createLinearGradient(0,0,420,420);
+grad.addColorStop(0,colors[i%colors.length]);
+grad.addColorStop(1,"#000");
+
+ctx.fillStyle=grad;
 ctx.fill();
 
 ctx.save();
-ctx.translate(200,200);
-ctx.rotate(angle+slice/2);
-ctx.fillStyle="#000";
+ctx.translate(210,210);
+ctx.rotate(start+slice/2);
+ctx.fillStyle="white";
 ctx.textAlign="right";
 ctx.font="16px Arial";
-ctx.fillText(item,180,5);
+ctx.fillText(item.name,190,5);
 ctx.restore();
+
+start+=slice;
 
 });
 
 }
 
-drawWheel();
-
 function spin(){
 
-let random=Math.floor(Math.random()*items.length);
+velocity=Math.random()*0.4+0.45;
 
-let spins=10;
+animate();
 
-let finalAngle=(2*Math.PI/items.length)*random;
+}
 
-let totalRotation=spins*2*Math.PI + finalAngle;
+function animate(){
 
-let start=null;
+angle+=velocity;
 
-function animate(time){
-
-if(!start) start=time;
-
-let progress=(time-start)/4000;
-
-if(progress>1) progress=1;
-
-startAngle=totalRotation*progress;
+velocity*=0.992;
 
 drawWheel();
 
-if(progress<1){
+tick.currentTime=0;
+tick.play();
+
+if(velocity>0.002){
 
 requestAnimationFrame(animate);
 
 }else{
 
-showWinner(items[random]);
+finish();
 
 }
 
 }
 
-requestAnimationFrame(animate);
+function finish(){
+
+let total=totalWeight();
+
+let normalized=angle%(2*Math.PI);
+
+let accum=0;
+
+for(let item of items){
+
+let slice=(item.weight/total)*2*Math.PI;
+
+if(normalized<accum+slice){
+
+showWinner(item.name);
+break;
+
+}
+
+accum+=slice;
+
+}
 
 }
 
 function showWinner(name){
 
-document.getElementById("result").innerHTML="Winner: "+name;
+let popup=document.getElementById("winnerPopup");
 
-let history=document.getElementById("history");
+popup.innerHTML="🏆 "+name+" 🏆";
 
-history.innerHTML="Last winner: "+name+"<br>"+history.innerHTML;
+popup.style.display="flex";
 
 confetti();
 
 }
 
+function closePopup(){
+document.getElementById("winnerPopup").style.display="none";
+}
+
 function addItem(){
 
-let input=document.getElementById("itemInput");
+let name=document.getElementById("nameInput").value;
+let weight=parseInt(document.getElementById("weightInput").value);
 
-if(!input.value) return;
+if(!name||weight<=0) return;
 
-items.push(input.value);
+items.push({name,weight});
+
+save();
+
+}
+
+function removeItem(i){
+
+items.splice(i,1);
+
+save();
+
+}
+
+function save(){
 
 localStorage.setItem("wheelItems",JSON.stringify(items));
 
-input.value="";
+renderItems();
 
 drawWheel();
 
 }
 
-function shareWheel(){
+function renderItems(){
 
-let link=location.origin+"?items="+items.join(",");
+let list=document.getElementById("itemsList");
 
-navigator.clipboard.writeText(link);
+list.innerHTML="";
 
-alert("Share link copied!");
+items.forEach((item,i)=>{
+
+let div=document.createElement("div");
+
+div.className="itemRow";
+
+div.innerHTML=
+item.name+" (x"+item.weight+")"+
+` <button class="removeBtn" onclick="removeItem(${i})">Remove</button>`;
+
+list.appendChild(div);
+
+});
 
 }
 
 function confetti(){
 
-for(let i=0;i<100;i++){
+for(let i=0;i<120;i++){
 
-let div=document.createElement("div");
+let c=document.createElement("div");
 
-div.style.position="fixed";
-div.style.left=Math.random()*100+"vw";
-div.style.top="-10px";
-div.style.width="6px";
-div.style.height="6px";
-div.style.background=colors[Math.floor(Math.random()*colors.length)];
-div.style.animation="fall 3s linear";
+c.style.position="fixed";
+c.style.left=Math.random()*100+"vw";
+c.style.top="-10px";
+c.style.width="8px";
+c.style.height="8px";
+c.style.background=colors[Math.floor(Math.random()*colors.length)];
+c.style.transition="3s";
 
-document.body.appendChild(div);
+document.body.appendChild(c);
 
-setTimeout(()=>div.remove(),3000);
+setTimeout(()=>{
+c.style.transform="translateY(100vh) rotate(720deg)";
+},10);
+
+setTimeout(()=>c.remove(),3000);
 
 }
 
 }
+
+renderItems();
+drawWheel();
 
 </script>
 
 </body>
-
 </html>
