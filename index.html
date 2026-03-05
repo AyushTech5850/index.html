@@ -1,468 +1,248 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D Spinning Wheel</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Spin Wheel Picker</title>
 
 <style>
 
-/* ===========================
-GENERAL PAGE STYLE
-=========================== */
-
 body{
-    font-family:Arial, sans-serif;
-    background:linear-gradient(135deg,#1e3c72,#2a5298);
-    color:white;
-    margin:0;
-    text-align:center;
+font-family:Arial;
+background:#121212;
+color:white;
+text-align:center;
+margin:0;
 }
 
-.container{
-    max-width:900px;
-    margin:auto;
-    padding:20px;
+h1{
+margin-top:20px;
 }
 
-/* ===========================
-WHEEL AREA
-=========================== */
-
-.wheel-wrapper{
-    position:relative;
-    margin:auto;
-    width:420px;
-    height:420px;
+#wheel{
+margin-top:20px;
+border-radius:50%;
+box-shadow:0 0 30px rgba(0,0,0,0.7);
 }
-
-canvas{
-    border-radius:50%;
-    background:#111;
-    box-shadow:
-        inset 0 0 20px rgba(255,255,255,0.2),
-        0 10px 40px rgba(0,0,0,0.6);
-}
-
-/* Pointer arrow */
 
 .pointer{
-    position:absolute;
-    left:50%;
-    transform:translateX(-50%);
-    top:-5px;
-    width:0;
-    height:0;
-    border-left:18px solid transparent;
-    border-right:18px solid transparent;
-    border-bottom:30px solid #ffd700;
+width:0;
+height:0;
+border-left:20px solid transparent;
+border-right:20px solid transparent;
+border-bottom:30px solid yellow;
+margin:auto;
 }
 
-/* ===========================
-BUTTONS
-=========================== */
-
-button{
-    padding:12px 20px;
-    border:none;
-    border-radius:6px;
-    font-weight:bold;
-    cursor:pointer;
-    margin:5px;
-}
-
-#spinBtn{
-    background:#00d26a;
-    color:white;
-    font-size:18px;
-}
-
-button:hover{
-    transform:scale(1.05);
-}
-
-/* ===========================
-INPUT PANEL
-=========================== */
-
-.panel{
-    background:rgba(255,255,255,0.1);
-    padding:15px;
-    border-radius:10px;
-    margin-top:20px;
+.controls{
+margin-top:20px;
 }
 
 input{
-    padding:6px;
+padding:8px;
+margin:5px;
 }
 
-/* Item list */
-
-.item{
-    display:flex;
-    justify-content:space-between;
-    padding:5px;
-    margin:5px;
-    background:rgba(255,255,255,0.2);
-    border-radius:6px;
+button{
+padding:10px 16px;
+border:none;
+border-radius:6px;
+background:#00c853;
+color:white;
+font-weight:bold;
+cursor:pointer;
 }
 
-/* Result */
+button:hover{
+opacity:0.9;
+}
 
 #result{
-    font-size:24px;
-    margin-top:15px;
-    font-weight:bold;
-    color:#ffd700;
+font-size:24px;
+margin-top:20px;
+color:#ffd600;
 }
 
-/* ===========================
-CONFETTI
-=========================== */
-
-.confetti{
-    position:fixed;
-    width:8px;
-    height:8px;
-    top:-10px;
-    animation:fall 3s linear forwards;
-}
-
-@keyframes fall{
-    to{
-        transform:translateY(100vh) rotate(720deg);
-        opacity:0;
-    }
-}
-
-/* Responsive */
-
-@media(max-width:500px){
-    .wheel-wrapper{
-        width:320px;
-        height:320px;
-    }
+#history{
+margin-top:20px;
+font-size:14px;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<div class="container">
-
-<h1>🎡 3D Spinning Wheel</h1>
-
-<div class="wheel-wrapper">
+<h1>🎡 Advanced Spin Wheel</h1>
 
 <div class="pointer"></div>
 
 <canvas id="wheel" width="400" height="400"></canvas>
 
+<div class="controls">
+
+<input id="itemInput" placeholder="Add item">
+<button onclick="addItem()">Add</button>
+
+<button onclick="spin()">SPIN</button>
+
+<button onclick="shareWheel()">Share Wheel</button>
+
 </div>
-
-<br>
-
-<button id="spinBtn">SPIN</button>
 
 <div id="result"></div>
 
-<div class="panel">
-
-<h3>Add Item</h3>
-
-<input id="nameInput" placeholder="Name">
-<input id="qtyInput" type="number" min="1" value="1">
-<button onclick="addItem()">Add</button>
-
-<div id="itemsList"></div>
-
-</div>
-
-</div>
+<div id="history"></div>
 
 <script>
 
-/* =============================
-DATA STORAGE
-============================= */
-
-let items=[
-{name:"Gold",qty:2},
-{name:"Silver",qty:1},
-{name:"Bronze",qty:1}
-];
-
-const colors=[
-"#ff7675","#74b9ff","#ffeaa7","#55efc4",
-"#a29bfe","#fd79a8","#81ecec","#fab1a0"
-];
+let items = JSON.parse(localStorage.getItem("wheelItems")) || ["Apple","Banana","Orange"];
 
 const canvas=document.getElementById("wheel");
 const ctx=canvas.getContext("2d");
 
 let startAngle=0;
-let spinning=false;
 
-
-/* =============================
-SPIN SOUND
-============================= */
-
-const tick=new Audio(
-"https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
-);
-
-
-/* =============================
-DRAW WHEEL
-============================= */
+const colors=[
+"#ff5252","#ff9800","#ffeb3b",
+"#4caf50","#03a9f4","#9c27b0",
+"#e91e63","#00bcd4"
+];
 
 function drawWheel(){
 
-const total=items.reduce((s,i)=>s+i.qty,0);
-
-let angle=startAngle;
+let slice=2*Math.PI/items.length;
 
 ctx.clearRect(0,0,400,400);
 
 items.forEach((item,i)=>{
 
-const slice=(item.qty/total)*Math.PI*2;
-
-/* 3D gradient effect */
-
-const grad=ctx.createRadialGradient(
-200,200,50,
-200,200,200
-);
-
-grad.addColorStop(0,colors[i%colors.length]);
-grad.addColorStop(1,"#000");
+let angle=startAngle+i*slice;
 
 ctx.beginPath();
-
 ctx.moveTo(200,200);
-
 ctx.arc(200,200,200,angle,angle+slice);
 
-ctx.fillStyle=grad;
-
+ctx.fillStyle=colors[i%colors.length];
 ctx.fill();
 
-/* text */
-
 ctx.save();
-
 ctx.translate(200,200);
-
 ctx.rotate(angle+slice/2);
-
-ctx.fillStyle="#fff";
-
+ctx.fillStyle="#000";
 ctx.textAlign="right";
-
-ctx.font="bold 16px Arial";
-
-ctx.fillText(item.name,180,5);
-
+ctx.font="16px Arial";
+ctx.fillText(item,180,5);
 ctx.restore();
-
-angle+=slice;
 
 });
 
 }
 
+drawWheel();
 
-/* =============================
-SPIN WHEEL
-============================= */
+function spin(){
 
-function spinWheel(){
+let random=Math.floor(Math.random()*items.length);
 
-if(spinning||items.length==0) return;
+let spins=10;
 
-spinning=true;
+let finalAngle=(2*Math.PI/items.length)*random;
 
-const total=items.reduce((s,i)=>s+i.qty,0);
-
-/* weighted random */
-
-let r=Math.random()*total;
-
-let selected;
-
-for(let item of items){
-
-r-=item.qty;
-
-if(r<=0){
-selected=item;
-break;
-}
-
-}
-
-const index=items.indexOf(selected);
-
-const slice=(selected.qty/total)*360;
-
-const spins=6+Math.random()*5;
-
-const finalAngle=360*spins+(index*slice);
-
-animateSpin(finalAngle,selected);
-
-}
-
-
-/* =============================
-ANIMATION
-============================= */
-
-function animateSpin(deg,item){
+let totalRotation=spins*2*Math.PI + finalAngle;
 
 let start=null;
 
-const duration=5000;
+function animate(time){
 
-function frame(t){
+if(!start) start=time;
 
-if(!start) start=t;
+let progress=(time-start)/4000;
 
-const progress=t-start;
+if(progress>1) progress=1;
 
-const ease=1-Math.pow(1-progress/duration,3);
-
-startAngle=(deg*ease)*Math.PI/180;
+startAngle=totalRotation*progress;
 
 drawWheel();
 
-/* play tick sound */
+if(progress<1){
 
-if(progress%200<20){
-tick.currentTime=0;
-tick.play();
-}
-
-if(progress<duration){
-
-requestAnimationFrame(frame);
+requestAnimationFrame(animate);
 
 }else{
 
-spinning=false;
+showWinner(items[random]);
 
-document.getElementById("result").innerText=
-"Winner: "+item.name;
+}
 
-/* confetti celebration */
+}
+
+requestAnimationFrame(animate);
+
+}
+
+function showWinner(name){
+
+document.getElementById("result").innerHTML="Winner: "+name;
+
+let history=document.getElementById("history");
+
+history.innerHTML="Last winner: "+name+"<br>"+history.innerHTML;
 
 confetti();
 
 }
 
+function addItem(){
+
+let input=document.getElementById("itemInput");
+
+if(!input.value) return;
+
+items.push(input.value);
+
+localStorage.setItem("wheelItems",JSON.stringify(items));
+
+input.value="";
+
+drawWheel();
+
 }
 
-requestAnimationFrame(frame);
+function shareWheel(){
+
+let link=location.origin+"?items="+items.join(",");
+
+navigator.clipboard.writeText(link);
+
+alert("Share link copied!");
 
 }
-
-
-/* =============================
-CONFETTI EFFECT
-============================= */
 
 function confetti(){
 
-for(let i=0;i<150;i++){
+for(let i=0;i<100;i++){
 
 let div=document.createElement("div");
 
-div.className="confetti";
-
+div.style.position="fixed";
 div.style.left=Math.random()*100+"vw";
-
-div.style.background=
-colors[Math.floor(Math.random()*colors.length)];
-
-div.style.animationDuration=
-2+Math.random()*2+"s";
+div.style.top="-10px";
+div.style.width="6px";
+div.style.height="6px";
+div.style.background=colors[Math.floor(Math.random()*colors.length)];
+div.style.animation="fall 3s linear";
 
 document.body.appendChild(div);
 
-setTimeout(()=>div.remove(),4000);
+setTimeout(()=>div.remove(),3000);
 
 }
 
 }
-
-
-/* =============================
-ITEM MANAGEMENT
-============================= */
-
-function addItem(){
-
-const name=document.getElementById("nameInput").value;
-
-const qty=parseInt(
-document.getElementById("qtyInput").value
-);
-
-if(!name||qty<=0) return;
-
-items.push({name,qty});
-
-updateList();
-
-drawWheel();
-
-}
-
-function removeItem(i){
-
-items.splice(i,1);
-
-updateList();
-
-drawWheel();
-
-}
-
-function updateList(){
-
-const list=document.getElementById("itemsList");
-
-list.innerHTML="";
-
-items.forEach((item,i)=>{
-
-const div=document.createElement("div");
-
-div.className="item";
-
-div.innerHTML=
-item.name+" (x"+item.qty+")"+
-` <button onclick="removeItem(${i})">❌</button>`;
-
-list.appendChild(div);
-
-});
-
-}
-
-
-/* =============================
-INIT
-============================= */
-
-document.getElementById("spinBtn").onclick=spinWheel;
-
-updateList();
-
-drawWheel();
 
 </script>
 
